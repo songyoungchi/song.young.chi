@@ -15,9 +15,6 @@ jobs:
         run: |
           type -p gh >/dev/null || (curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null && sudo apt update && sudo apt install gh -y)
 
-      - name: Authenticate GitHub CLI
-        run: echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
-
       - name: Delete old codespace
         run: |
           OLD_CS=$(gh codespace list --repo ${{ github.repository }} --json name --jq '.[0].name // empty')
@@ -27,7 +24,7 @@ jobs:
             sleep 30
           fi
 
-      - name: Create and keep-alive Codespace
+      - name: Create codespace and get VLESS link
         id: setup
         run: |
           echo "🚀 Creating new Codespace (4h idle timeout)..."
@@ -36,7 +33,7 @@ jobs:
             --branch main \
             --machine basicLinux32gb \
             --idle-timeout 240m)
-          echo "✅ Codespace created successfully: $CODESPACE_NAME"
+          echo "✅ Codespace created: $CODESPACE_NAME"
           echo "cs_name=$CODESPACE_NAME" >> $GITHUB_OUTPUT
 
           echo "⏳ Waiting for Xray to start (180s)..."
