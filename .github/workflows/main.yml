@@ -1,0 +1,69 @@
+name: G2Ray Auto-Setup (4h Keep-Alive)
+on:
+  workflow_dispatch:
+env:
+  GH_TOKEN: ${{ secrets.GH_PAT }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install GitHub CLI
+        run: |
+          type -p gh >/dev/null || (curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null && sudo apt update && sudo apt install gh -y)
+
+      - name: Delete old codespace
+        run: |
+          OLD_CS=$(gh codespace list --repo ${{ github.repository }} --json name --jq '.[0].name // empty')
+          if [ -n "$OLD_CS" ]; then
+            echo "🧹 Deleting old Codespace: $OLD_CS"
+            gh codespace delete -c "$OLD_CS" --force
+            sleep 30
+          fi
+
+      - name: Create and keep-alive Codespace
+        id: setup
+        run: |
+          echo "🚀 Creating new Codespace (4h idle timeout)..."
+          CODESPACE_NAME=$(gh codespace create \
+            --repo ${{ github.repository }} \
+            --branch main \
+            --machine basicLinux32gb \
+            --idle-timeout 240m \
+            --json name \
+            --jq '.name')
+          echo "✅ Codespace created successfully: $CODESPACE_NAME"
+          echo "cs_name=$CODESPACE_NAME" >> $GITHUB_OUTPUT
+
+          echo "⏳ Waiting for Xray to start (180s)..."
+          sleep 180
+
+          # Extract VLESS link from config
+          USER_ID=$(curl -s "https://raw.githubusercontent.com/edrisranjbar/g2ray/main/.devcontainer/config.json" 2>/dev/null | jq -r '.inbounds[0].settings.clients[0].id // "550e8400-e29b-41d4-a716-446655440000"')
+          DOMAIN="${CODESPACE_NAME}-443.app.github.dev"
+          echo "VLESS_LINK=vless://$USER_ID@94.130.50.12:443?encryption=none&security=tls&type=xhttp&mode=packet-up&sni=$DOMAIN&path=%2F#ghtun" >> $GITHUB_OUTPUT
+
+      - name: Send Telegram Notification
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ] && [ -n "${{ steps.setup.outputs.VLESS_LINK }}" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -d chat_id="${TELEGRAM_CHAT_ID}" \
+              -d text="✅ **G2Ray Proxy is ready!** ✅%0A%0A\`${{ steps.setup.outputs.VLESS_LINK }}\`%0A%0A_Keep-Alive active for 4 hours._" \
+              --fail
+          fi
+
+      - name: 4-hour Keep-Alive Loop
+        run: |
+          echo "🔄 Idle timer reset every 10 minutes for 4 hours..."
+          for i in {1..24}; do
+            echo "$(date): Keep-alive iteration $i/24"
+            # SSH into codespace and write a tiny log entry
+            gh codespace ssh -c ${{ steps.setup.outputs.cs_name }} -- bash -c "echo '\$(date): keep-alive ping' >> /tmp/keepalive.log" 2>/dev/null || true
+            sleep 600
+          done
