@@ -27,10 +27,13 @@ jobs:
       - name: Create codespace and get VLESS link
         id: setup
         run: |
+          DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)
+          echo "Default branch is: $DEFAULT_BRANCH"
+
           echo "🚀 Creating new Codespace (4h idle timeout)..."
           CODESPACE_NAME=$(gh codespace create \
             --repo ${{ github.repository }} \
-            --branch main \
+            --branch $DEFAULT_BRANCH \
             --machine basicLinux32gb \
             --idle-timeout 240m)
           echo "✅ Codespace created: $CODESPACE_NAME"
