@@ -15,6 +15,9 @@ jobs:
         run: |
           type -p gh >/dev/null || (curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null && sudo apt update && sudo apt install gh -y)
 
+      - name: Authenticate GitHub CLI
+        run: echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
+
       - name: Delete old codespace
         run: |
           OLD_CS=$(gh codespace list --repo ${{ github.repository }} --json name --jq '.[0].name // empty')
@@ -28,7 +31,6 @@ jobs:
         id: setup
         run: |
           echo "🚀 Creating new Codespace (4h idle timeout)..."
-          # gh codespace create outputs the codespace name directly (no --json)
           CODESPACE_NAME=$(gh codespace create \
             --repo ${{ github.repository }} \
             --branch main \
@@ -40,8 +42,7 @@ jobs:
           echo "⏳ Waiting for Xray to start (180s)..."
           sleep 180
 
-          # Extract USER_ID from config.json in the repo
-          USER_ID=$(curl -s "https://raw.githubusercontent.com/edrisranjbar/g2ray/main/.devcontainer/config.json" 2>/dev/null | jq -r '.inbounds[0].settings.clients[0].id // "550e8400-e29b-41d4-a716-446655440000"')
+          USER_ID=$(curl -s "https://raw.githubusercontent.com/edrisranjbar/g2ray/main/.devcontainer/config.json" | jq -r '.inbounds[0].settings.clients[0].id // "550e8400-e29b-41d4-a716-446655440000"')
           DOMAIN="${CODESPACE_NAME}-443.app.github.dev"
           VLESS_LINK="vless://$USER_ID@94.130.50.12:443?encryption=none&security=tls&type=xhttp&mode=packet-up&sni=$DOMAIN&path=%2F#ghtun"
           echo "VLESS_LINK=$VLESS_LINK" >> $GITHUB_OUTPUT
@@ -63,7 +64,6 @@ jobs:
           echo "🔄 Idle timer reset every 10 minutes for 4 hours..."
           for i in {1..24}; do
             echo "$(date): Keep-alive iteration $i/24"
-            # SSH into codespace and write a tiny log entry
             gh codespace ssh -c ${{ steps.setup.outputs.cs_name }} -- bash -c "echo '\$(date): keep-alive ping' >> /tmp/keepalive.log" 2>/dev/null || true
             sleep 600
           done
