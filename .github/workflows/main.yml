@@ -55,10 +55,7 @@ jobs:
           VLESS_LINK: ${{ steps.setup.outputs.VLESS_LINK }}
         run: |
           if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ] && [ -n "$VLESS_LINK" ]; then
-            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-              --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
-              --data-urlencode "text=✅ **G2Ray Proxy is ready!** ✅%0A%0A\`${VLESS_LINK}\`%0A%0A_Keep-Alive active for 4 hours._"
-              --fail
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=✅ **G2Ray Proxy is ready!** ✅%0A%0A\`${VLESS_LINK}\`%0A%0A_Keep-Alive active for 4 hours._" --fail
           fi
 
       - name: 4-hour Keep-Alive Loop
