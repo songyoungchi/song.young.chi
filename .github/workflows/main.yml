@@ -45,7 +45,7 @@ jobs:
 
           USER_ID=$(jq -r '.inbounds[0].settings.clients[0].id' .devcontainer/config.json)
           DOMAIN="${CODESPACE_NAME}-443.app.github.dev"
-          VLESS_LINK="vless://$USER_ID@94.130.50.12:443?encryption=none&security=tls&type=xhttp&mode=packet-up&sni=$DOMAIN&path=%2F#ghtun"
+          VLESS_LINK="vless://$USER_ID@94.130.50.12:443?encryption=none&security=tls&type=xhttp&mode=packet-up&sni=$DOMAIN&path=%2F#ghtun" \
           echo "VLESS_LINK=$VLESS_LINK" >> $GITHUB_OUTPUT
 
       - name: Send Telegram Notification
